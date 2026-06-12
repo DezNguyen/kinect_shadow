@@ -1,65 +1,77 @@
 import asyncio
 import base64
-import numpy as np
 import cv2
+import numpy as np
 import websockets
 import pykinect_azure as pykinect
 
 pykinect.initialize_libraries()
+
 device = pykinect.start_device()
 
-background = None
-THRESHOLD = 80
+calibration = device.get_calibration(depth_mode=1, color_resolution=0)
+params = calibration.depth_params
 
 
+MIN_DEPTH = 1
+MAX_DEPTH = 2500
+
+
+
+#Websocket handler
 async def handler(websocket):
-    global background
+    while True:
+        capture = device.update()
 
-    async def receive_commands():
-        global background
+        #depth-bild
+        ret, depth = capture.get_depth_image()
 
-        async for message in websocket:
-            if message == "save_background":
-                capture = device.update()
-                ret, depth = capture.get_depth_image()
+        mask = np.where(
+            (depth > MIN_DEPTH) & (depth < MAX_DEPTH),
+            0,
+            255
+        ).astype(np.uint8)
 
-                if ret:
-                    background = depth.copy()
-                    print("Background saved")
-
-    command_task = asyncio.create_task(receive_commands())
-
-    try:
-        while True:
-            capture = device.update()
-            ret, depth = capture.get_depth_image()
-
-            if not ret:
-                continue
-
-            if background is None:
-                mask = np.ones_like(depth, dtype=np.uint8) * 255
-            else:
-                valid = (depth > 0) & (background > 0)
-
-                person = valid & (depth < background - THRESHOLD)
-
-                mask = np.where(person, 0, 255).astype(np.uint8)
-
-            _, buffer = cv2.imencode(".jpg", mask)
-            jpg_as_text = base64.b64encode(buffer).decode("utf-8")
-
-            await websocket.send(jpg_as_text)
-            await asyncio.sleep(1 / 30)
-
-    finally:
-        command_task.cancel()
+        mask = remove_fisheye(mask, strength=0.2)
 
 
+
+        #jpg erzeugen (rohes bild ist gross)
+        _, buffer = cv2.imencode('.jpg', mask)
+
+        #bild zu text
+        jpg_as_text = base64.b64encode(buffer).decode("utf-8")
+
+        # an browser senden
+        await websocket.send(jpg_as_text)
+
+        #fps limitieren
+        await asyncio.sleep(1 / 30)
+
+def remove_fisheye(img, strength=0.25):
+    h, w = img.shape[:2]
+    y, x = np.indices((h, w), dtype=np.float32)
+
+    cx = w / 2
+    cy = h / 2
+
+    x_norm = (x - cx) / cx
+    y_norm = (y - cy) / cy
+
+    r2 = x_norm * x_norm + y_norm * y_norm
+
+    factor = 1 + strength * r2
+
+    map_x = cx + (x - cx) / factor
+    map_y = cy + (y - cy) / factor
+
+    return cv2.remap(img, map_x, map_y, cv2.INTER_NEAREST)
+
+
+#server starten
 async def main():
     async with websockets.serve(handler, "localhost", 8765):
-        print("Server läuft auf ws://localhost:8765")
+        print("WebSocket laeuft auf ws://localhost:8765")
         await asyncio.Future()
-
 
 asyncio.run(main())
