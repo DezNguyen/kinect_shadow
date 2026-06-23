@@ -1,5 +1,5 @@
 let socket;
-let shadowImg;
+let kinectImage;
 let loading = false;
 
 function setup() {
@@ -13,7 +13,7 @@ function setup() {
     loading = true;
 
     loadImage("data:image/jpeg;base64," + event.data, function (img) {
-      shadowImg = img;
+      kinectImage = img;
       loading = false;
     });
   };
@@ -22,16 +22,16 @@ function setup() {
 function draw() {
   background(255);
 
-  if (!shadowImg) return;
+  if (!kinectImage) return;
 
-  let s = Math.min(width / shadowImg.width, height / shadowImg.height);
-  let drawW = shadowImg.width * s;
-  let drawH = shadowImg.height * s;
+  let s = Math.min(width / kinectImage.width, height / kinectImage.height);
+  let drawW = kinectImage.width * s;
+  let drawH = kinectImage.height * s;
 
   let x = (width - drawW) / 2;
   let y = (height - drawH) / 2;
 
-  image(shadowImg, x, y, drawW, drawH);
+  image(kinectImage, x, y, drawW, drawH);
 }
 
 function windowResized() {
