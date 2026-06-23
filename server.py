@@ -7,14 +7,20 @@ import pykinect_azure as pykinect
 
 pykinect.initialize_libraries()
 
-#device_config = pykinect.default_configuration()
-#device_config.color_resolution = pykinect.k4a_color_resolution_t
-print([x for x in dir(pykinect) if "DEPTH_MODE" in x])
-print([x for x in dir(pykinect) if "COLOR_RESOLUTION" in x])
+device_config = pykinect.default_configuration
+device_config.color_resolution = pykinect.K4A_COLOR_RESOLUTION_OFF
+device_config.depth_resolution = pykinect.K4A_DEPTH_MODE_WFOV_UNBINNED
 
-device = pykinect.start_device()
 
-calibration = device.get_calibration(depth_mode=1, color_resolution=0)
+#print([x for x in dir(pykinect) if "DEPTH_MODE" in x])
+#print([x for x in dir(pykinect) if "COLOR_RESOLUTION" in x])
+
+device = pykinect.start_device(config=device_config)
+
+
+calibration = device.get_calibration(
+    depth_mode=device_config.depth_resolution,
+    color_resolution=device_config.color_resolution)
 params = calibration.depth_params
 
 
@@ -37,7 +43,7 @@ async def handler(websocket):
             255
         ).astype(np.uint8)
 
-        mask = remove_fisheye(mask, strength=0.2)
+        mask = remove_fisheye(mask, strength=0.22)
 
 
 
