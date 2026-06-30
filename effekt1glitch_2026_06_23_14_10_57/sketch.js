@@ -39,13 +39,6 @@ function draw() {
   }
 }
 
-function keyPressed(){
-  if (key === 'b' || key === 'B'){
-    socket.send("save_background");
-    console.log("Background saved");
-  }
-}
-
 function windowResized() {
   resizeCanvas(windowWidth, windowHeight);
   background(0); 
