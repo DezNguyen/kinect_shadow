@@ -1,4 +1,3 @@
-import {INVERT} from "./p5";
 
 let socket;
 let kinectImage;
@@ -36,7 +35,7 @@ function draw() {
 
   image(kinectImage, x, y, drawW, drawH);
 
-  //filter(INVERT);
+  filter(INVERT, false);
 }
 
 function windowResized() {
