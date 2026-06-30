@@ -25,7 +25,7 @@ params = calibration.depth_params
 
 
 MIN_DEPTH = 1
-MAX_DEPTH = 2500
+MAX_DEPTH = 2150
 
 
 
