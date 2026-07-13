@@ -105,6 +105,13 @@ function draw() {
 class Ghost {
   constructor(sequence) {
     this.sequence = sequence;
+
+    this.color = color(
+        random(255),
+        random(255),
+        random(255)
+    );
+
     this.frameIndex = 0;
 
     this.alpha = 0;
@@ -155,7 +162,11 @@ class Ghost {
   }
 
   display() {
-    tint(255, this.alpha);
+    tint(
+        red(this.color),
+        green(this.color),
+        blue(this.color),
+        this.alpha);
     let currentImg = this.sequence[this.frameIndex];
     if (currentImg) {
         image(currentImg, 0, 0, width, height);
