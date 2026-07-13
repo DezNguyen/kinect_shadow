@@ -1,0 +1,187 @@
+let socket;
+let kinectImage;
+
+
+let memoryBank = [];
+let maxSequences = 8;
+let recordInterval = 2;
+
+
+let currentSequence = [];
+let wasPersonPresent = false;
+
+
+let activeGhosts = [];
+let maxGhosts =  3;
+
+let humanMassThreshold = 320;
+let currentPixelMass = 0;
+
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  socket = new WebSocket('ws://localhost:8765');
+
+  socket.onopen = function() {
+    console.log("Erfolgreich mit Kinect-Server verbunden!");
+  };
+
+  socket.onmessage = function(event) {
+    let imgSrc = "data:image/jpeg;base64," + event.data;
+    loadImage(imgSrc, function(img) {
+      kinectImage = img;
+    });
+  };
+}
+
+function draw() {
+  background(255);
+
+  if (kinectImage) {
+    let personPresentNow = hasPerson(kinectImage);
+    if (personPresentNow) {
+      if (frameCount % recordInterval === 0) {
+        currentSequence.push(kinectImage.get());
+
+        // Speicherschutz: max ~6 Sek.
+        if (currentSequence.length > 60) {
+          currentSequence.shift();
+        }
+      }
+    }
+    if (wasPersonPresent && !personPresentNow) {
+      if (currentSequence.length >= 5) {
+        memoryBank.push([...currentSequence]);
+
+        if (memoryBank.length > maxSequences) {
+          memoryBank.shift();
+        }
+
+        if (activeGhosts.length < maxGhosts) {
+          let selectedSequence = random(memoryBank);
+          activeGhosts.push(new Ghost(selectedSequence));
+        }
+      }
+
+      currentSequence = [];
+    }
+
+    wasPersonPresent = personPresentNow;
+
+    blendMode(MULTIPLY);
+
+    for (let i = activeGhosts.length - 1; i >= 0; i--) {
+      let g = activeGhosts[i];
+      g.update();
+      g.display();
+      if (g.isDead) {
+        activeGhosts.splice(i, 1);
+      }
+    }
+
+    tint(255, 255);
+    image(kinectImage, 0, 0, width, height);
+
+    blendMode(BLEND);
+    noTint();
+
+    fill(255, 0, 0);
+    noStroke();
+    textSize(32);
+    textAlign(LEFT, TOP);
+    text("Live-Pixel-Masse: " + currentPixelMass, 30, 30);
+    text("Aktueller Threshold: " + humanMassThreshold, 30, 70);
+
+    // Visuelles Feedback
+    if (currentPixelMass > humanMassThreshold) {
+        fill(0, 255, 0);
+        text("STATUS: AUFNAHME LÄUFT...", 30, 110);
+    } else {
+        fill(0, 0, 255);
+        text("STATUS: RAUM LEER / GEISTER AKTIV", 30, 110);
+    }
+  }
+}
+
+class Ghost {
+  constructor(sequence) {
+    this.sequence = sequence;
+    this.frameIndex = 0;
+
+    this.alpha = 0;
+    this.targetAlpha = 110;
+    this.fadeSpeed = 0.3;
+
+    this.lifeTime = random(300, 1800);
+    this.state = "FADE_IN";
+    this.isDead = false;
+
+    this.animationSpeed = 6;
+    this.age = 0;
+  }
+
+  update() {
+    this.age++;
+
+    if (this.state === "FADE_IN") {
+      this.alpha += this.fadeSpeed;
+      if (this.alpha >= this.targetAlpha) {
+        this.alpha = this.targetAlpha;
+        this.state = "LIVING";
+      }
+    } else if (this.state === "LIVING") {
+      this.lifeTime--;
+      if (this.lifeTime <= 0) {
+        this.state = "FADE_OUT";
+      }
+    } else if (this.state === "FADE_OUT") {
+      this.alpha -= this.fadeSpeed;
+      if (this.alpha <= 0) {
+        this.alpha = 0;
+        this.isDead = true;
+      }
+    }
+
+    if (this.age % this.animationSpeed === 0) {
+        this.frameIndex++;
+
+        if (this.frameIndex >= this.sequence.length) {
+            this.frameIndex = 0;
+
+            if (memoryBank.length > 0) {
+                this.sequence = random(memoryBank);
+            }
+        }
+    }
+  }
+
+  display() {
+    tint(255, this.alpha);
+    let currentImg = this.sequence[this.frameIndex];
+    if (currentImg) {
+        image(currentImg, 0, 0, width, height);
+    }
+  }
+}
+
+function hasPerson(img) {
+  img.loadPixels();
+  let darkPixelCount = 0;
+
+  for (let i = 0; i < img.pixels.length; i += 400) {
+    if (img.pixels[i] < 50) {
+      darkPixelCount++;
+    }
+  }
+
+  currentPixelMass = darkPixelCount;
+
+  if (darkPixelCount > humanMassThreshold) {
+    return true;
+  }
+
+  return false;
+}
+
+function windowResized() {
+  resizeCanvas(windowWidth, windowHeight);
+}
