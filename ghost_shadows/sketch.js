@@ -104,15 +104,16 @@ function draw() {
 
 class Ghost {
   constructor(sequence) {
-    this.sequence = sequence;
-
-    this.color = color(
-        random(255),
-        random(255),
-        random(255)
-    );
-
     this.frameIndex = 0;
+
+    this.color = {
+      r: random(80, 255),
+      g: random(80, 255),
+      b: random(80, 255)
+    };
+
+    // Frames einmalig vorbereiten
+    this.sequence = sequence.map(img => this.createColoredFrame(img));
 
     this.alpha = 0;
     this.targetAlpha = 110;
@@ -126,22 +127,51 @@ class Ghost {
     this.age = 0;
   }
 
+  createColoredFrame(img) {
+    const colored = img.get();
+    colored.loadPixels();
+
+    for (let i = 0; i < colored.pixels.length; i += 4) {
+      const brightness =
+        (colored.pixels[i] +
+         colored.pixels[i + 1] +
+         colored.pixels[i + 2]) / 3;
+
+      if (brightness < 50) {
+        // Schatten einfärben
+        colored.pixels[i] = this.color.r;
+        colored.pixels[i + 1] = this.color.g;
+        colored.pixels[i + 2] = this.color.b;
+        colored.pixels[i + 3] = 255;
+      } else {
+        // Hintergrund transparent
+        colored.pixels[i + 3] = 0;
+      }
+    }
+
+    colored.updatePixels();
+    return colored;
+  }
+
   update() {
     this.age++;
 
     if (this.state === "FADE_IN") {
       this.alpha += this.fadeSpeed;
+
       if (this.alpha >= this.targetAlpha) {
         this.alpha = this.targetAlpha;
         this.state = "LIVING";
       }
     } else if (this.state === "LIVING") {
       this.lifeTime--;
+
       if (this.lifeTime <= 0) {
         this.state = "FADE_OUT";
       }
     } else if (this.state === "FADE_OUT") {
       this.alpha -= this.fadeSpeed;
+
       if (this.alpha <= 0) {
         this.alpha = 0;
         this.isDead = true;
@@ -149,30 +179,25 @@ class Ghost {
     }
 
     if (this.age % this.animationSpeed === 0) {
-        this.frameIndex++;
+      this.frameIndex++;
 
-        if (this.frameIndex >= this.sequence.length) {
-            this.frameIndex = 0;
-
-            if (memoryBank.length > 0) {
-                this.sequence = random(memoryBank);
-            }
-        }
+      if (this.frameIndex >= this.sequence.length) {
+        this.frameIndex = 0;
+      }
     }
   }
 
   display() {
-    tint(
-        red(this.color),
-        green(this.color),
-        blue(this.color),
-        this.alpha);
-    let currentImg = this.sequence[this.frameIndex];
-    if (currentImg) {
-        image(currentImg, 0, 0, width, height);
-    }
+    const currentImg = this.sequence[this.frameIndex];
+
+    if (!currentImg) return;
+
+    tint(255, this.alpha);
+    image(currentImg, 0, 0, width, height);
+    noTint();
   }
 }
+
 
 function hasPerson(img) {
   img.loadPixels();
