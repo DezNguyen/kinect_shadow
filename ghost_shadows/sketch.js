@@ -105,8 +105,6 @@ function draw() {
 class Ghost {
   constructor(sequence) {
     this.frameIndex = 0;
-    this.scale = random(0.8, 1.2);
-    this.scaleSpeed = random(-0.0015, 0.0015);
 
     this.color = {
       r: random(80, 255),
@@ -115,9 +113,7 @@ class Ghost {
     };
 
     // Frames einmalig vorbereiten
-    this.sequence = sequence
-      .map(img => this.createColoredFrame(img))
-      .filter(frame => frame !== null);
+    this.sequence = sequence.map(img => this.createColoredFrame(img));
 
     this.alpha = 0;
     this.targetAlpha = 110;
@@ -132,76 +128,33 @@ class Ghost {
   }
 
   createColoredFrame(img) {
-  const colored = img.get();
-  colored.loadPixels();
+    const colored = img.get();
+    colored.loadPixels();
 
-  let minX = colored.width;
-  let minY = colored.height;
-  let maxX = 0;
-  let maxY = 0;
-  let foundShadow = false;
-
-  for (let y = 0; y < colored.height; y++) {
-    for (let x = 0; x < colored.width; x++) {
-      const i = (x + y * colored.width) * 4;
-
+    for (let i = 0; i < colored.pixels.length; i += 4) {
       const brightness =
         (colored.pixels[i] +
          colored.pixels[i + 1] +
          colored.pixels[i + 2]) / 3;
 
       if (brightness < 50) {
-        foundShadow = true;
-
+        // Schatten einfärben
         colored.pixels[i] = this.color.r;
         colored.pixels[i + 1] = this.color.g;
         colored.pixels[i + 2] = this.color.b;
         colored.pixels[i + 3] = 255;
-
-        minX = min(minX, x);
-        minY = min(minY, y);
-        maxX = max(maxX, x);
-        maxY = max(maxY, y);
       } else {
+        // Hintergrund transparent
         colored.pixels[i + 3] = 0;
       }
     }
-  }
 
-  colored.updatePixels();
-
-  if (!foundShadow) {
-    return null;
-  }
-
-  const padding = 10;
-
-  minX = max(0, minX - padding);
-  minY = max(0, minY - padding);
-  maxX = min(colored.width - 1, maxX + padding);
-  maxY = min(colored.height - 1, maxY + padding);
-
-  return {
-    img: colored.get(
-      minX,
-      minY,
-      maxX - minX + 1,
-      maxY - minY + 1
-    ),
-    x: minX,
-    y: minY,
-    w: maxX - minX + 1,
-    h: maxY - minY + 1
-  };
+    colored.updatePixels();
+    return colored;
   }
 
   update() {
     this.age++;
-    this.scale += this.scaleSpeed;
-
-    if(this.scale > 1.4 || this.scale < 0.7){
-      this.scaleSpeed *= -1;
-    }
 
     if (this.state === "FADE_IN") {
       this.alpha += this.fadeSpeed;
@@ -235,32 +188,13 @@ class Ghost {
   }
 
   display() {
-    const frame = this.sequence[this.frameIndex];
+    const currentImg = this.sequence[this.frameIndex];
 
-    if (!frame) return;
-
-    const centerX = frame.x + frame.w / 2;
-    const centerY = frame.y + frame.h / 2;
-
-    const scaleX = width / kinectImage.width;
-    const scaleY = height / kinectImage.height;
-
-    push();
-
-    translate(centerX * scaleX, centerY * scaleY);
-    scale(this.scale);
+    if (!currentImg) return;
 
     tint(255, this.alpha);
-
-    image(
-        frame.img,
-        -(frame.w * scaleX) / 2,
-        -(frame.h * scaleY) / 2,
-        frame.w * scaleX,
-        frame.h * scaleY
-    );
-
-    pop();
+    image(currentImg, 0, 0, width, height);
+    noTint();
   }
 }
 
