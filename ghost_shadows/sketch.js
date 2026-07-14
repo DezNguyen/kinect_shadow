@@ -79,21 +79,7 @@ function draw() {
     }
 
     tint(255, 255);
-    //image(kinectImage, 0, 0, width, height);
-    push();
-
-    translate(width / 2, height / 2);
-    scale(this.scale);
-
-    image(
-        currentImg,
-        -width / 2,
-        -height / 2,
-        width,
-        height
-    );
-
-    pop();
+    image(kinectImage, 0, 0, width, height);
 
     blendMode(BLEND);
     noTint();
@@ -213,9 +199,26 @@ class Ghost {
 
     if (!currentImg) return;
 
+    push();
+
+    translate(width / 2, height / 2);
+
+    // Ghost um den Mittelpunkt herum vergrößern/verkleinern
+    scale(this.scale);
+
+    // Transparenz anwenden
     tint(255, this.alpha);
-    image(currentImg, 0, 0, width, height);
-    noTint();
+
+    image(
+      currentImg,
+      -width / 2,
+      -height / 2,
+      width,
+      height
+    );
+
+    pop();
+    
   }
 }
 
