@@ -105,6 +105,8 @@ function draw() {
 class Ghost {
   constructor(sequence) {
     this.frameIndex = 0;
+    this.scale = random(0.8, 1.2);
+    this.scaleSpeed = random(-0.0015, 0.0015);
 
     this.color = {
       r: random(80, 255),
@@ -155,6 +157,11 @@ class Ghost {
 
   update() {
     this.age++;
+    this.scale += this.scaleSpeed;
+
+    if(this.scale > 1.4 || this.scale < 0.7){
+      this.scaleSpeed *= -1;
+    }
 
     if (this.state === "FADE_IN") {
       this.alpha += this.fadeSpeed;
