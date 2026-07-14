@@ -107,9 +107,9 @@ class Ghost {
     this.sequence = sequence;
 
     this.color = color(
-        random(255),
-        random(255),
-        random(255)
+        random(80,255),
+        random(80,255),
+        random(80, 255)
     );
 
     this.frameIndex = 0;
@@ -162,16 +162,37 @@ class Ghost {
   }
 
   display() {
-    tint(
-        red(this.color),
-        green(this.color),
-        blue(this.color),
-        this.alpha);
-    let currentImg = this.sequence[this.frameIndex];
-    if (currentImg) {
-        image(currentImg, 0, 0, width, height);
+  const currentImg = this.sequence[this.frameIndex];
+  if (!currentImg) return;
+
+  const coloredGhost = currentImg.get();
+  coloredGhost.loadPixels();
+
+  const r = red(this.color);
+  const g = green(this.color);
+  const b = blue(this.color);
+
+  for (let i = 0; i < coloredGhost.pixels.length; i += 4) {
+    const brightness =
+      (coloredGhost.pixels[i] +
+       coloredGhost.pixels[i + 1] +
+       coloredGhost.pixels[i + 2]) / 3;
+
+    if (brightness < 50) {
+      // Schwarzer Schatten wird farbig
+      coloredGhost.pixels[i] = r;
+      coloredGhost.pixels[i + 1] = g;
+      coloredGhost.pixels[i + 2] = b;
+      coloredGhost.pixels[i + 3] = this.alpha;
+    } else {
+      // Weißer Hintergrund wird transparent
+      coloredGhost.pixels[i + 3] = 0;
     }
   }
+
+  coloredGhost.updatePixels();
+  image(coloredGhost, 0, 0, width, height);
+}
 }
 
 function hasPerson(img) {
