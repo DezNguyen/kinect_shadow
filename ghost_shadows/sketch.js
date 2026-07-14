@@ -14,7 +14,7 @@ let wasPersonPresent = false;
 let activeGhosts = [];
 let maxGhosts =  3;
 
-let humanMassThreshold = 120;
+let humanMassThreshold = 320;
 let currentPixelMass = 0;
 
 function setup() {
