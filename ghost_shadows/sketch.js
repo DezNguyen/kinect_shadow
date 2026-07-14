@@ -79,7 +79,21 @@ function draw() {
     }
 
     tint(255, 255);
-    image(kinectImage, 0, 0, width, height);
+    //image(kinectImage, 0, 0, width, height);
+    push();
+
+    translate(width / 2, height / 2);
+    scale(this.scale);
+
+    image(
+        currentImg,
+        -width / 2,
+        -height / 2,
+        width,
+        height
+    );
+
+    pop();
 
     blendMode(BLEND);
     noTint();
