@@ -15,7 +15,7 @@ let activeGhosts = [];
 let maxGhosts = 3;
 
 // Personenerkennung
-let humanMassThreshold = 320;
+let humanMassThreshold = 75;
 let currentPixelMass = 0;
 
 // Auflösungseffekt des Live-Schattens
@@ -23,7 +23,7 @@ let personVisibleFrames = 0;
 
 // Nach wie vielen Frames beginnt die Auflösung?
 // Bei ungefähr 30 FPS entsprechen 150 Frames etwa 5 Sekunden.
-let dissolveStartFrames = 150;
+let dissolveStartFrames = 300;
 
 // Fortschritt von 0 bis 1
 let dissolveProgress = 0;
@@ -77,6 +77,13 @@ function draw() {
 
   wasPersonPresent = personPresentNow;
 
+  // Live-Schatten zeichnen
+  if (dissolveProgress <= 0) {
+    image(kinectImage, 0, 0, width, height);
+  } else {
+    drawTopDownDissolve(kinectImage, dissolveProgress);
+  }
+
   // Geister zeichnen
   blendMode(MULTIPLY);
 
@@ -93,13 +100,6 @@ function draw() {
 
   blendMode(BLEND);
   noTint();
-
-  // Live-Schatten zeichnen
-  if (dissolveProgress <= 0) {
-    image(kinectImage, 0, 0, width, height);
-  } else {
-    drawTopDownDissolve(kinectImage, dissolveProgress);
-  }
 
   drawDebugInformation(personPresentNow);
 }
@@ -461,17 +461,6 @@ function drawDebugInformation(personPresentNow) {
     );
   }
 }
-
-
-function keyPressed() {
-  if (key === "b" || key === "B") {
-    if (socket.readyState === WebSocket.OPEN) {
-      socket.send("save_background");
-      console.log("Befehl zum Speichern des Hintergrunds gesendet.");
-    }
-  }
-}
-
 
 function windowResized() {
   resizeCanvas(windowWidth, windowHeight);
