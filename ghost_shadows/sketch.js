@@ -79,7 +79,7 @@ function draw() {
 
   // Live-Schatten zeichnen
   if (dissolveProgress <= 0) {
-    image(kinectImage, 0, 0, width, height);
+    drawKinectImage(kinectImage);
   } else {
     drawTopDownDissolve(kinectImage, dissolveProgress);
   }
@@ -159,17 +159,20 @@ function updateDissolveEffect(personPresentNow) {
 function drawTopDownDissolve(img, progress) {
   img.loadPixels();
 
-  // Kleinere Zahl = mehr Kreise und detaillierter,
-  // aber auch rechenintensiver
   const step = 6;
 
-  const scaleX = width / img.width;
-  const scaleY = height / img.height;
+  const s = Math.min(
+    width / img.width,
+    height / img.height
+  );
 
-  // Diese Linie wandert von oben nach unten
+  const drawW = img.width * s;
+  const drawH = img.height * s;
+
+  const imageOffsetX = (width - drawW) / 2;
+  const imageOffsetY = (height - drawH) / 2;
+
   const dissolveLine = progress * img.height;
-
-  // Breite des Übergangsbereichs hinter der Linie
   const transitionHeight = 100;
 
   noStroke();
@@ -185,32 +188,28 @@ function drawTopDownDissolve(img, progress) {
           img.pixels[index + 2]
         ) / 3;
 
-      // Nur dunkle Pixel gehören zum Schatten
       if (brightness >= 50) {
         continue;
       }
 
-      const screenX = x * scaleX;
-      const screenY = y * scaleY;
+      const screenX = imageOffsetX + x * s;
+      const screenY = imageOffsetY + y * s;
 
-      // Dieser Teil liegt noch unterhalb der Auflösungsgrenze
       if (y > dissolveLine) {
         fill(0, 255);
 
         rect(
           screenX,
           screenY,
-          step * scaleX + 1,
-          step * scaleY + 1
+          step * s + 1,
+          step * s + 1
         );
 
         continue;
       }
 
-      // Abstand des Pixels zur wandernden Grenze
       const distanceFromLine = dissolveLine - y;
 
-      // 0 direkt an der Grenze, 1 weit dahinter
       const localProgress = constrain(
         distanceFromLine / transitionHeight,
         0,
@@ -223,22 +222,17 @@ function drawTopDownDissolve(img, progress) {
         frameCount * 0.015
       );
 
-      // Seitliches Wegdriften
-      const offsetX =
+      const particleOffsetX =
         (noiseValue - 0.5) *
         110 *
         localProgress;
 
-      // Kreise schweben nach oben
-      const offsetY =
+      const particleOffsetY =
         -100 *
         localProgress *
         noiseValue;
 
-      // Direkt an der Grenze noch relativ groß,
-      // weiter oben immer kleiner
-      const originalSize =
-        min(step * scaleX, step * scaleY) + 2;
+      const originalSize = step * s + 2;
 
       const circleSize = lerp(
         originalSize,
@@ -246,7 +240,6 @@ function drawTopDownDissolve(img, progress) {
         localProgress
       );
 
-      // Weiter entfernte Partikel werden transparenter
       const alpha = lerp(
         255,
         0,
@@ -256,8 +249,8 @@ function drawTopDownDissolve(img, progress) {
       fill(0, alpha);
 
       circle(
-        screenX + offsetX,
-        screenY + offsetY,
+        screenX + particleOffsetX,
+        screenY + particleOffsetY,
         circleSize
       );
     }
@@ -379,7 +372,7 @@ class Ghost {
     }
 
     tint(255, this.alpha);
-    image(currentImg, 0, 0, width, height);
+    drawKinectImage(currentImg);
     noTint();
   }
 }
@@ -460,6 +453,21 @@ function drawDebugInformation(personPresentNow) {
       135
     );
   }
+}
+
+function drawKinectImage(img) {
+  const s = Math.min(
+    width / img.width,
+    height / img.height
+  );
+
+  const drawW = img.width * s;
+  const drawH = img.height * s;
+
+  const x = (width - drawW) / 2;
+  const y = (height - drawH) / 2;
+
+  image(img, x, y, drawW, drawH);
 }
 
 function windowResized() {
