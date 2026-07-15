@@ -15,7 +15,7 @@ let activeGhosts = [];
 let maxGhosts = 3;
 
 // Personenerkennung
-let humanMassThreshold = 320;
+let humanMassThreshold = 75;
 let currentPixelMass = 0;
 
 // Auflösungseffekt des Live-Schattens
@@ -23,7 +23,7 @@ let personVisibleFrames = 0;
 
 // Nach wie vielen Frames beginnt die Auflösung?
 // Bei ungefähr 30 FPS entsprechen 150 Frames etwa 5 Sekunden.
-let dissolveStartFrames = 150;
+let dissolveStartFrames = 300;
 
 // Fortschritt von 0 bis 1
 let dissolveProgress = 0;
@@ -77,6 +77,13 @@ function draw() {
 
   wasPersonPresent = personPresentNow;
 
+  // Live-Schatten zeichnen
+  if (dissolveProgress <= 0) {
+    image(kinectImage, 0, 0, width, height);
+  } else {
+    drawTopDownDissolve(kinectImage, dissolveProgress);
+  }
+
   // Geister zeichnen
   blendMode(MULTIPLY);
 
@@ -93,13 +100,6 @@ function draw() {
 
   blendMode(BLEND);
   noTint();
-
-  // Live-Schatten zeichnen
-  if (dissolveProgress <= 0) {
-    drawKinectImage(kinectImage);
-  } else {
-    drawTopDownDissolve(kinectImage, dissolveProgress);
-  }
 
   drawDebugInformation(personPresentNow);
 }
@@ -163,13 +163,8 @@ function drawTopDownDissolve(img, progress) {
   // aber auch rechenintensiver
   const step = 6;
 
-  let s = Math.min(width / img.width, height / img.height);
-
-  let drawW = img.width * s;
-  let drawH = img.height * s;
-
-  let offsetX = (width - drawW) / 2;
-  let offsetY = (height - drawH) / 2;
+  const scaleX = width / img.width;
+  const scaleY = height / img.height;
 
   // Diese Linie wandert von oben nach unten
   const dissolveLine = progress * img.height;
@@ -195,8 +190,8 @@ function drawTopDownDissolve(img, progress) {
         continue;
       }
 
-      const screenX = offsetX + x * s;
-      const screenY = offsetY + y * s;
+      const screenX = x * scaleX;
+      const screenY = y * scaleY;
 
       // Dieser Teil liegt noch unterhalb der Auflösungsgrenze
       if (y > dissolveLine) {
@@ -205,8 +200,8 @@ function drawTopDownDissolve(img, progress) {
         rect(
           screenX,
           screenY,
-          step * s + 1,
-          step * s + 1
+          step * scaleX + 1,
+          step * scaleY + 1
         );
 
         continue;
@@ -384,7 +379,7 @@ class Ghost {
     }
 
     tint(255, this.alpha);
-    drawKinectImage(kinectImage);
+    image(currentImg, 0, 0, width, height);
     noTint();
   }
 }
@@ -466,20 +461,6 @@ function drawDebugInformation(personPresentNow) {
     );
   }
 }
-
-
-function drawKinectImage(img) {
-  let s = Math.min(width / img.width, height / img.height);
-
-  let drawW = img.width * s;
-  let drawH = img.height * s;
-
-  let x = (width - drawW) / 2;
-  let y = (height - drawH) / 2;
-
-  image(img, x, y, drawW, drawH);
-}
-
 
 function windowResized() {
   resizeCanvas(windowWidth, windowHeight);
