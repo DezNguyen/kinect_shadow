@@ -96,7 +96,7 @@ function draw() {
 
   // Live-Schatten zeichnen
   if (dissolveProgress <= 0) {
-    image(kinectImage, 0, 0, width, height);
+    drawKinectImage(kinectImage);
   } else {
     drawTopDownDissolve(kinectImage, dissolveProgress);
   }
@@ -163,8 +163,13 @@ function drawTopDownDissolve(img, progress) {
   // aber auch rechenintensiver
   const step = 6;
 
-  const scaleX = width / img.width;
-  const scaleY = height / img.height;
+  let s = Math.min(width / img.width, height / img.height);
+
+  let drawW = img.width * s;
+  let drawH = img.height * s;
+
+  let offsetX = (width - drawW) / 2;
+  let offsetY = (height - drawH) / 2;
 
   // Diese Linie wandert von oben nach unten
   const dissolveLine = progress * img.height;
@@ -190,8 +195,8 @@ function drawTopDownDissolve(img, progress) {
         continue;
       }
 
-      const screenX = x * scaleX;
-      const screenY = y * scaleY;
+      const screenX = offsetX + x * s;
+      const screenY = offsetY + y * s;
 
       // Dieser Teil liegt noch unterhalb der Auflösungsgrenze
       if (y > dissolveLine) {
@@ -200,8 +205,8 @@ function drawTopDownDissolve(img, progress) {
         rect(
           screenX,
           screenY,
-          step * scaleX + 1,
-          step * scaleY + 1
+          step * s + 1,
+          step * s + 1
         );
 
         continue;
@@ -379,7 +384,7 @@ class Ghost {
     }
 
     tint(255, this.alpha);
-    image(currentImg, 0, 0, width, height);
+    drawKinectImage(kinectImage);
     noTint();
   }
 }
@@ -463,13 +468,16 @@ function drawDebugInformation(personPresentNow) {
 }
 
 
-function keyPressed() {
-  if (key === "b" || key === "B") {
-    if (socket.readyState === WebSocket.OPEN) {
-      socket.send("save_background");
-      console.log("Befehl zum Speichern des Hintergrunds gesendet.");
-    }
-  }
+function drawKinectImage(img) {
+  let s = Math.min(width / img.width, height / img.height);
+
+  let drawW = img.width * s;
+  let drawH = img.height * s;
+
+  let x = (width - drawW) / 2;
+  let y = (height - drawH) / 2;
+
+  image(img, x, y, drawW, drawH);
 }
 
 
