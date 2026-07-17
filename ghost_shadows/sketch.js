@@ -157,6 +157,9 @@ function updateDissolveEffect(personPresentNow) {
 
 
 function drawTopDownDissolve(img, progress) {
+  // Zuerst das unveränderte, glatte Bild zeichnen
+  drawKinectImage(img);
+
   img.loadPixels();
 
   const step = 6;
@@ -172,12 +175,26 @@ function drawTopDownDissolve(img, progress) {
   const imageOffsetX = (width - drawW) / 2;
   const imageOffsetY = (height - drawH) / 2;
 
+  // Grenze in den Koordinaten des Kinect-Bildes
   const dissolveLine = progress * img.height;
-  const transitionHeight = 100;
 
+  // Grenze in Bildschirmkoordinaten
+  const dissolveScreenY =
+    imageOffsetY + dissolveLine * s;
+
+  // Alles oberhalb der Grenze aus dem normalen Schatten entfernen
+  fill(255);
   noStroke();
 
-  for (let y = 0; y < img.height; y += step) {
+  rect(
+    imageOffsetX,
+    imageOffsetY,
+    drawW,
+    dissolveScreenY - imageOffsetY
+  );
+
+  // Partikel nur im bereits aufgelösten Bereich zeichnen
+  for (let y = 0; y < dissolveLine; y += step) {
     for (let x = 0; x < img.width; x += step) {
       const index = (x + y * img.width) * 4;
 
@@ -188,6 +205,7 @@ function drawTopDownDissolve(img, progress) {
           img.pixels[index + 2]
         ) / 3;
 
+      // Nur schwarze Schattenpixel verwenden
       if (brightness >= 50) {
         continue;
       }
@@ -195,23 +213,10 @@ function drawTopDownDissolve(img, progress) {
       const screenX = imageOffsetX + x * s;
       const screenY = imageOffsetY + y * s;
 
-      if (y > dissolveLine) {
-        fill(0, 255);
-
-        rect(
-          screenX,
-          screenY,
-          step * s + 1,
-          step * s + 1
-        );
-
-        continue;
-      }
-
       const distanceFromLine = dissolveLine - y;
 
       const localProgress = constrain(
-        distanceFromLine / transitionHeight,
+        distanceFromLine / 100,
         0,
         1
       );
@@ -232,10 +237,8 @@ function drawTopDownDissolve(img, progress) {
         localProgress *
         noiseValue;
 
-      const originalSize = step * s + 2;
-
       const circleSize = lerp(
-        originalSize,
+        step * s + 2,
         1,
         localProgress
       );
