@@ -353,15 +353,6 @@ class Ghost {
 
       if (this.frameIndex >= this.sequence.length) {
         this.frameIndex = 0;
-
-        // Nach einem Durchlauf optional eine andere Sequenz verwenden
-        if (memoryBank.length > 0) {
-          const selectedSequence = random(memoryBank);
-
-          this.sequence = selectedSequence.map(
-            img => this.createColoredFrame(img)
-          );
-        }
       }
     }
   }
