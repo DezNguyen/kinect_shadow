@@ -31,6 +31,14 @@ let dissolveProgress = 0;
 // Geschwindigkeit der Auflösung
 let dissolveSpeed = 0.0025;
 
+//Ghost farbpalette
+let ghostColors = [
+  {r: 255, g: 80, b: 80},
+  {r: 80, g: 220, b: 120},
+  {r: 110, g: 100, b: 155},
+  {r: 255, g: 100, b: 190},
+]
+
 
 function setup() {
   createCanvas(windowWidth, windowHeight);
@@ -265,11 +273,7 @@ class Ghost {
   constructor(sequence) {
     this.frameIndex = 0;
 
-    this.color = {
-      r: random(80, 255),
-      g: random(80, 255),
-      b: random(80, 255)
-    };
+    this.color = random(ghostColors);
 
     // Frames werden nur einmal eingefärbt.
     // Dadurch bleibt die Wiedergabe flüssiger.
