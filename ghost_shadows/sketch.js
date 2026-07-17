@@ -31,6 +31,19 @@ let dissolveProgress = 0;
 // Geschwindigkeit der Auflösung
 let dissolveSpeed = 0.0025;
 
+//Farbpalette fuer Geister
+
+const ghostColors = [
+  { r: 255, g: 80,  b: 80  },  // Rot
+  { r: 255, g: 170, b: 40  },  // Orange
+  //{ r: 255, g: 230, b: 60  },  // Gelb
+  { r: 80,  g: 220, b: 120 },  // Grün
+  { r: 60,  g: 190, b: 255 },  // Hellblau
+  { r: 110, g: 100, b: 255 },  // Blau-Violett
+  { r: 210, g: 80,  b: 255 }   // Magenta
+  //{ r: 255, g: 100, b: 190 }   // Pink
+];
+
 
 function setup() {
   createCanvas(windowWidth, windowHeight);
@@ -265,11 +278,7 @@ class Ghost {
   constructor(sequence) {
     this.frameIndex = 0;
 
-    this.color = {
-      r: random(80, 255),
-      g: random(80, 255),
-      b: random(80, 255)
-    };
+    this.color = random(ghostColors);
 
     // Frames werden nur einmal eingefärbt.
     // Dadurch bleibt die Wiedergabe flüssiger.
