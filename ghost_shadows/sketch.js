@@ -129,6 +129,29 @@ function updateRecording(personPresentNow) {
   // Person war vorher da, ist jetzt aber verschwunden
   if (wasPersonPresent && !personPresentNow) {
     if (currentSequence.length >= 5) {
+      // Die gerade abgeschlossene Aufnahme kopieren
+      const finishedSequence = [...currentSequence];
+
+      // Aufnahme im Speicher ablegen
+      memoryBank.push(finishedSequence);
+
+      if (memoryBank.length > maxSequences) {
+        memoryBank.shift();
+      }
+
+      // Geist genau aus der gerade aufgenommenen Bewegung erzeugen
+      if (activeGhosts.length < maxGhosts) {
+        activeGhosts.push(new Ghost(finishedSequence));
+      }
+    }
+
+    currentSequence = [];
+  }
+}
+
+  // Person war vorher da, ist jetzt aber verschwunden
+  if (wasPersonPresent && !personPresentNow) {
+    if (currentSequence.length >= 5) {
       memoryBank.push([...currentSequence]);
 
       if (memoryBank.length > maxSequences) {
