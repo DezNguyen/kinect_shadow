@@ -29,7 +29,7 @@ let dissolveStartFrames = 300;
 let dissolveProgress = 0;
 
 // Geschwindigkeit der Auflösung
-let dissolveSpeed = 0.0025;
+let dissolveSpeed = 0.0010;
 
 //Ghost farbpalette
 let ghostColors = [
