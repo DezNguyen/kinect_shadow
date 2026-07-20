@@ -17,6 +17,7 @@ let maxGhosts = 3;
 // Personenerkennung
 let humanMassThreshold = 75;
 let currentPixelMass = 0;
+let shadowIndex = 0;
 
 // Auflösungseffekt des Live-Schattens
 let personVisibleFrames = 0;
@@ -174,7 +175,7 @@ function drawTopDownDissolve(img, progress) {
 
   img.loadPixels();
 
-  const step = 6;
+  const step = 2;
 
   const s = Math.min(
     width / img.width,
