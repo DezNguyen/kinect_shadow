@@ -149,25 +149,6 @@ function updateRecording(personPresentNow) {
   }
 }
 
-  // Person war vorher da, ist jetzt aber verschwunden
-  if (wasPersonPresent && !personPresentNow) {
-    if (currentSequence.length >= 5) {
-      memoryBank.push([...currentSequence]);
-
-      if (memoryBank.length > maxSequences) {
-        memoryBank.shift();
-      }
-
-      if (activeGhosts.length < maxGhosts) {
-        const selectedSequence = random(memoryBank);
-        activeGhosts.push(new Ghost(selectedSequence));
-      }
-    }
-
-    currentSequence = [];
-  }
-}
-
 
 function updateDissolveEffect(personPresentNow) {
   if (personPresentNow) {
