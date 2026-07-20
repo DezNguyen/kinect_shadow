@@ -4,7 +4,7 @@
 
 Die Anwendung nutzt eine geteilte Architektur, die in Echtzeit über WebSockets (Port 8765) kommuniziert.
 
-* **Python-Backend (Sensorik):** Erfasst Tiefendaten via Azure Kinect (`pykinect_azure`), blendet den Hintergrund aus (`MIN/MAX_DEPTH`) und korrigiert die Linsenverzerrung der Kamera (`remove_fisheye`). Die isolierte Silhouette wird als Base64-String (JPEG) mit 30 FPS gesendet.
+* **Python-Backend:** Erfasst Tiefendaten via Azure Kinect (`pykinect_azure`), blendet den Hintergrund aus (`MIN/MAX_DEPTH`) und korrigiert die Linsenverzerrung der Kamera (`remove_fisheye`). Die isolierte Silhouette wird als Base64-String (JPEG) mit 30 FPS gesendet.
 * **p5.js-Frontend:** Empfängt den Stream, verwaltet die Personenerkennung und speichert Bewegungssequenzen in einer `memoryBank`. Übernimmt das ressourcenschonende Rendering der eingefärbten Geister und berechnet den auf Perlin-Noise basierenden Auflösungseffekt.
 
 ## 2. Installation
