@@ -7,6 +7,7 @@ import pykinect_azure as pykinect
 import json
 import re
 from pathlib import Path
+import random
 
 
 BASE_DIRECTORY = Path(__file__).resolve().parent
@@ -76,10 +77,22 @@ async def receive_browser_messages(websocket):
             continue
 
         try:
-            handle_ghost_message(message)
+            data = json.loads(message)
+        except json.JSONDecodeError:
+            print("Ungültige Nachricht vom Browser")
+            continue
+
+        message_type = data.get("type")
+
+        try:
+            if message_type == "request_random_ghost":
+                await send_random_ghost(websocket)
+            else:
+                handle_ghost_message(message)
+
         except Exception as error:
             print(
-                "Fehler beim Speichern eines Geistes:",
+                "Fehler beim Verarbeiten der Browser-Nachricht:",
                 error
             )
 
@@ -217,6 +230,105 @@ def handle_ghost_message(message: str) -> None:
             )
 
         print(f"Geist vollständig gespeichert: {ghost_id}")
+
+
+async def send_random_ghost(websocket):
+    available_ghosts = []
+
+    for ghost_folder in GHOST_DIRECTORY.iterdir():
+        if not ghost_folder.is_dir():
+            continue
+
+        metadata_path = ghost_folder / "metadata.json"
+
+        if not metadata_path.exists():
+            continue
+
+        try:
+            metadata = json.loads(
+                metadata_path.read_text(encoding="utf-8")
+            )
+        except (json.JSONDecodeError, OSError):
+            continue
+
+        # Nur vollständig gespeicherte Geister laden
+        if not metadata.get("complete", False):
+            continue
+
+        frame_paths = sorted(
+            ghost_folder.glob("frame_*.png")
+        )
+
+        if len(frame_paths) < 5:
+            continue
+
+        available_ghosts.append(
+            {
+                "id": ghost_folder.name,
+                "frames": frame_paths
+            }
+        )
+
+    if not available_ghosts:
+        await websocket.send(
+            json.dumps({
+                "type": "ghost_load_none"
+            })
+        )
+
+        print("Keine gespeicherten Geister gefunden")
+        return
+
+    selected_ghost = random.choice(available_ghosts)
+
+    ghost_id = selected_ghost["id"]
+    frame_paths = selected_ghost["frames"]
+
+    await websocket.send(
+        json.dumps({
+            "type": "ghost_load_start",
+            "ghostId": ghost_id,
+            "frameCount": len(frame_paths)
+        })
+    )
+
+    for frame_index, frame_path in enumerate(frame_paths):
+        try:
+            image_bytes = frame_path.read_bytes()
+        except OSError as error:
+            print(
+                f"Frame konnte nicht gelesen werden: "
+                f"{frame_path}: {error}"
+            )
+            continue
+
+        base64_data = base64.b64encode(
+            image_bytes
+        ).decode("utf-8")
+
+        await websocket.send(
+            json.dumps({
+                "type": "ghost_load_frame",
+                "ghostId": ghost_id,
+                "frameIndex": frame_index,
+                "data": base64_data
+            })
+        )
+
+        # Andere Tasks wie Kinect-Streaming kurz ausführen lassen
+        await asyncio.sleep(0)
+
+    await websocket.send(
+        json.dumps({
+            "type": "ghost_load_end",
+            "ghostId": ghost_id
+        })
+    )
+
+    print(
+        f"Gespeicherten Geist gesendet: "
+        f"{ghost_id} mit {len(frame_paths)} Frames"
+    )
 
 #server starten
 async def main():

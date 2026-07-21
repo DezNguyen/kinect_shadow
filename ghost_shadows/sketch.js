@@ -16,6 +16,14 @@ let recordingFinished = false;
 let recordStartFrame = 0;
 let recordLength = 120;
 
+// Laden gespeicherter Geister
+let loadingDiskGhost = null;
+let diskGhostRequestPending = false;
+
+// Zufällige Wartezeit zwischen zwei Geistern
+let minGhostSpawnDelay = 10000;
+let maxGhostSpawnDelay = 30000;
+
 // Aktive Geister
 let activeGhosts = [];
 let maxGhosts = 3;
@@ -54,6 +62,7 @@ function setup() {
 
   socket.onopen = function () {
     console.log("Erfolgreich mit Kinect-Server verbunden!");
+    scheduleNextDiskGhost();
   };
 
   socket.onerror = function (error) {
@@ -65,12 +74,204 @@ function setup() {
   };
 
   socket.onmessage = function (event) {
-    const imgSrc = "data:image/jpeg;base64," + event.data;
+  const message = event.data;
 
-    loadImage(imgSrc, function (img) {
+  // JSON-Nachricht vom Python-Server
+  if (message.startsWith("{")) {
+    try {
+      const data = JSON.parse(message);
+      handleServerMessage(data);
+    } catch (error) {
+      console.error(
+        "Server-Nachricht konnte nicht gelesen werden:",
+        error
+      );
+    }
+
+    return;
+  }
+
+  // Normales Kinect-Live-Bild
+  const imgSrc =
+    "data:image/jpeg;base64," + message;
+
+  loadImage(
+    imgSrc,
+
+    function (img) {
       kinectImage = img;
-    });
-  };
+    },
+
+    function (error) {
+      console.error(
+        "Kinect-Bild konnte nicht geladen werden:",
+        error
+      );
+    }
+  );
+};
+}
+
+function handleServerMessage(data) {
+  if (data.type === "ghost_load_start") {
+    loadingDiskGhost = {
+      ghostId: data.ghostId,
+      expectedFrames: data.frameCount,
+      frames: new Array(data.frameCount),
+      loadedFrames: 0,
+      transferFinished: false
+    };
+
+    console.log(
+      "Lade Geist von Festplatte:",
+      data.ghostId
+    );
+  }
+
+  else if (data.type === "ghost_load_frame") {
+    loadDiskGhostFrame(data);
+  }
+
+  else if (data.type === "ghost_load_end") {
+    if (
+      loadingDiskGhost &&
+      loadingDiskGhost.ghostId === data.ghostId
+    ) {
+      loadingDiskGhost.transferFinished = true;
+      tryFinishDiskGhost();
+    }
+  }
+
+  else if (data.type === "ghost_load_none") {
+    console.log(
+      "Auf der Festplatte befinden sich noch keine Geister."
+    );
+
+    diskGhostRequestPending = false;
+    scheduleNextDiskGhost();
+  }
+}
+
+function loadDiskGhostFrame(data) {
+  if (!loadingDiskGhost) {
+    return;
+  }
+
+  if (loadingDiskGhost.ghostId !== data.ghostId) {
+    return;
+  }
+
+  const imgSrc =
+    "data:image/png;base64," + data.data;
+
+  loadImage(
+    imgSrc,
+
+    function (img) {
+      // Wichtig: nach frameIndex einsetzen,
+      // da loadImage asynchron arbeitet.
+      loadingDiskGhost.frames[data.frameIndex] = img;
+      loadingDiskGhost.loadedFrames++;
+
+      tryFinishDiskGhost();
+    },
+
+    function (error) {
+      console.error(
+        "Ghost-Frame konnte nicht geladen werden:",
+        error
+      );
+    }
+  );
+}
+
+function tryFinishDiskGhost() {
+  if (!loadingDiskGhost) {
+    return;
+  }
+
+  const allFramesLoaded =
+    loadingDiskGhost.loadedFrames >=
+    loadingDiskGhost.expectedFrames;
+
+  if (
+    !loadingDiskGhost.transferFinished ||
+    !allFramesLoaded
+  ) {
+    return;
+  }
+
+  const finishedSequence =
+    loadingDiskGhost.frames.filter(
+      frame => frame !== undefined
+    );
+
+  if (
+    finishedSequence.length >= 5 &&
+    activeGhosts.length < maxGhosts
+  ) {
+    activeGhosts.push(
+      new Ghost(finishedSequence)
+    );
+
+    console.log(
+      "Geist von Festplatte gespawnt:",
+      loadingDiskGhost.ghostId
+    );
+  }
+
+  loadingDiskGhost = null;
+  diskGhostRequestPending = false;
+
+  scheduleNextDiskGhost();
+}
+
+function scheduleNextDiskGhost() {
+  const delay = random(
+    minGhostSpawnDelay,
+    maxGhostSpawnDelay
+  );
+
+  console.log(
+    "Nächster Festplatten-Geist in ca.",
+    round(delay / 1000),
+    "Sekunden"
+  );
+
+  setTimeout(
+    requestRandomDiskGhost,
+    delay
+  );
+}
+
+function requestRandomDiskGhost() {
+  if (
+    !socket ||
+    socket.readyState !== WebSocket.OPEN
+  ) {
+    scheduleNextDiskGhost();
+    return;
+  }
+
+  // Es wird bereits ein Geist geladen
+  if (diskGhostRequestPending) {
+    scheduleNextDiskGhost();
+    return;
+  }
+
+  // Maximalzahl an sichtbaren Geistern erreicht
+  if (activeGhosts.length >= maxGhosts) {
+    scheduleNextDiskGhost();
+    return;
+  }
+
+  diskGhostRequestPending = true;
+
+  socket.send(
+    JSON.stringify({
+      type: "request_random_ghost"
+    })
+  );
 }
 
 
