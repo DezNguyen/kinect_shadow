@@ -88,7 +88,9 @@ function draw() {
   const personPresentNow = hasPerson(kinectImage);
 
   updateDissolveEffect(personPresentNow);
-  updateRecording(personPresentNow);
+
+  saveFrames('ghost','png', 3, 22);
+  //updateRecording(personPresentNow);
 
   wasPersonPresent = personPresentNow;
 
@@ -179,6 +181,7 @@ function updateRecording(personPresentNow) {
     // Nur einen Geist erzeugen, wenn wirklich genug aufgenommen wurde
     if (currentSequence.length >= 5) {
       const finishedSequence = [...currentSequence];
+
 
       memoryBank.push(finishedSequence);
       memoryBank = shuffle(memoryBank);
