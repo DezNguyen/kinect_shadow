@@ -14,7 +14,7 @@ let recordingStarted = false;
 let recordingFinished = false;
 
 let recordStartFrame = 0;
-let recordLength = 60;
+let recordLength = 120;
 
 // Aktive Geister
 let activeGhosts = [];
@@ -181,6 +181,7 @@ function updateRecording(personPresentNow) {
       const finishedSequence = [...currentSequence];
 
       memoryBank.push(finishedSequence);
+      memoryBank = shuffle(memoryBank);
 
       if (memoryBank.length > maxSequences) {
         memoryBank.shift();
