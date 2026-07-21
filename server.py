@@ -86,7 +86,7 @@ async def receive_browser_messages(websocket):
         try:
             data = json.loads(message)
         except json.JSONDecodeError:
-            print("Ungültige Nachricht vom Browser")
+            print("Ungueltige Nachricht vom Browser")
             continue
 
         message_type = data.get("type")
@@ -163,7 +163,7 @@ def safe_ghost_id(ghost_id: str) -> str:
     cleaned = re.sub(r"[^a-zA-Z0-9_-]", "", ghost_id)
 
     if not cleaned:
-        raise ValueError("Ungültige Ghost-ID")
+        raise ValueError("Ungueltige Ghost-ID")
 
     return cleaned
 
@@ -239,7 +239,7 @@ def handle_ghost_message(message: str) -> None:
                 encoding="utf-8"
             )
 
-        print(f"Geist vollständig gespeichert: {ghost_id}")
+        print(f"Geist vollstaendig gespeichert: {ghost_id}")
 
 
 #waehlt eine vollstaendige aufnahme aus und sendet sie an den browser
@@ -262,7 +262,7 @@ async def send_random_ghost(websocket):
         except (json.JSONDecodeError, OSError):
             continue
 
-        # Nur vollständig gespeicherte Geister laden
+        # Nur vollstaendig gespeicherte Geister laden
         if not metadata.get("complete", False):
             continue
 
@@ -326,7 +326,7 @@ async def send_random_ghost(websocket):
             })
         )
 
-        # Andere Tasks wie Kinect-Streaming kurz ausführen lassen
+        # Andere Tasks wie Kinect-Streaming kurz ausfuehren lassen
         await asyncio.sleep(0)
 
     await websocket.send(

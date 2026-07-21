@@ -29,7 +29,7 @@ let recordLength = 120;
 let loadingDiskGhost = null;
 let diskGhostRequestPending = false;
 
-// Zufällige Wartezeit zwischen zwei Geistern
+// Zufaellige Wartezeit zwischen zwei Geistern
 let minGhostSpawnDelay = 10000;
 let maxGhostSpawnDelay = 30000;
 
@@ -42,17 +42,17 @@ let humanMassThreshold = 75;
 let currentPixelMass = 0;
 let shadowIndex = 0;
 
-// Auflösungseffekt des Live-Schattens
+// Aufloesungseffekt des Live-Schattens
 let personVisibleFrames = 0;
 
-// Nach wie vielen Frames beginnt die Auflösung?
-// Bei ungefähr 30 FPS entsprechen 150 Frames etwa 5 Sekunden.
+// Nach wie vielen Frames beginnt die Aufloesung?
+// Bei ungefaehr 30 FPS entsprechen 150 Frames etwa 5 Sekunden.
 let dissolveStartFrames = 300;
 
 // Fortschritt von 0 bis 1
 let dissolveProgress = 0;
 
-// Geschwindigkeit der Auflösung
+// Geschwindigkeit der Aufloesung
 let dissolveSpeed = 0.0010;
 
 //Ghost farbpalette
@@ -234,7 +234,7 @@ function scheduleNextDiskGhost() {
     maxGhostSpawnDelay
   );
 
-  console.log("Nächster Festplatten-Geist in ca.", round(delay / 1000), "Sekunden");
+  console.log("Naechster Festplatten-Geist in ca.", round(delay / 1000), "Sekunden");
 
   setTimeout(requestRandomDiskGhost, delay);
 }
@@ -391,11 +391,11 @@ function updateRecording(personPresentNow) {
       }
     } else {
       console.log(
-        "Person ging zu früh – keine vollständige Aufnahme"
+        "Person ging zu frueh – keine vollstaendige Aufnahme"
       );
     }
 
-    // alles für die naechste person zuruecksetzen
+    // alles fuer die naechste person zuruecksetzen
     currentSequence = [];
     recordingStarted = false;
     recordingFinished = false;
@@ -645,7 +645,7 @@ function drawDebugInformation(personPresentNow) {
 
   text("Threshold: " + humanMassThreshold, 30, 65);
 
-  text("Auflösung: " + nf(dissolveProgress * 100, 1, 1) + "%", 30, 100);
+  text("Aufloesung: " + nf(dissolveProgress * 100, 1, 1) + "%", 30, 100);
 
   if (personPresentNow) {
   fill(0, 170, 0);
@@ -665,7 +665,7 @@ function drawDebugInformation(personPresentNow) {
   text("STATUS: " + recordingStatus, 30, 135);
 
   if (personVisibleFrames > dissolveStartFrames) {
-    text("SCHATTEN LÖST SICH AUF", 30, 170);
+    text("SCHATTEN LOEST SICH AUF", 30, 170);
   }
 } else {
     fill(0, 0, 255);
