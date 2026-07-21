@@ -16,6 +16,14 @@ let recordingFinished = false;
 let recordStartFrame = 0;
 let recordLength = 120;
 
+// Laden gespeicherter Geister
+let loadingDiskGhost = null;
+let diskGhostRequestPending = false;
+
+// Zufällige Wartezeit zwischen zwei Geistern
+let minGhostSpawnDelay = 10000;
+let maxGhostSpawnDelay = 30000;
+
 // Aktive Geister
 let activeGhosts = [];
 let maxGhosts = 3;
@@ -67,6 +75,7 @@ function setup() {
 
   socket.onopen = function () {
     console.log("Erfolgreich mit Kinect-Server verbunden!");
+    scheduleNextDiskGhost();
   };
 
   socket.onerror = function (error) {
@@ -78,12 +87,204 @@ function setup() {
   };
 
   socket.onmessage = function (event) {
-    const imgSrc = "data:image/jpeg;base64," + event.data;
+  const message = event.data;
 
-    loadImage(imgSrc, function (img) {
+  // JSON-Nachricht vom Python-Server
+  if (message.startsWith("{")) {
+    try {
+      const data = JSON.parse(message);
+      handleServerMessage(data);
+    } catch (error) {
+      console.error(
+        "Server-Nachricht konnte nicht gelesen werden:",
+        error
+      );
+    }
+
+    return;
+  }
+
+  // Normales Kinect-Live-Bild
+  const imgSrc =
+    "data:image/jpeg;base64," + message;
+
+  loadImage(
+    imgSrc,
+
+    function (img) {
       kinectImage = img;
-    });
-  };
+    },
+
+    function (error) {
+      console.error(
+        "Kinect-Bild konnte nicht geladen werden:",
+        error
+      );
+    }
+  );
+};
+}
+
+function handleServerMessage(data) {
+  if (data.type === "ghost_load_start") {
+    loadingDiskGhost = {
+      ghostId: data.ghostId,
+      expectedFrames: data.frameCount,
+      frames: new Array(data.frameCount),
+      loadedFrames: 0,
+      transferFinished: false
+    };
+
+    console.log(
+      "Lade Geist von Festplatte:",
+      data.ghostId
+    );
+  }
+
+  else if (data.type === "ghost_load_frame") {
+    loadDiskGhostFrame(data);
+  }
+
+  else if (data.type === "ghost_load_end") {
+    if (
+      loadingDiskGhost &&
+      loadingDiskGhost.ghostId === data.ghostId
+    ) {
+      loadingDiskGhost.transferFinished = true;
+      tryFinishDiskGhost();
+    }
+  }
+
+  else if (data.type === "ghost_load_none") {
+    console.log(
+      "Auf der Festplatte befinden sich noch keine Geister."
+    );
+
+    diskGhostRequestPending = false;
+    scheduleNextDiskGhost();
+  }
+}
+
+function loadDiskGhostFrame(data) {
+  if (!loadingDiskGhost) {
+    return;
+  }
+
+  if (loadingDiskGhost.ghostId !== data.ghostId) {
+    return;
+  }
+
+  const imgSrc =
+    "data:image/png;base64," + data.data;
+
+  loadImage(
+    imgSrc,
+
+    function (img) {
+      // Wichtig: nach frameIndex einsetzen,
+      // da loadImage asynchron arbeitet.
+      loadingDiskGhost.frames[data.frameIndex] = img;
+      loadingDiskGhost.loadedFrames++;
+
+      tryFinishDiskGhost();
+    },
+
+    function (error) {
+      console.error(
+        "Ghost-Frame konnte nicht geladen werden:",
+        error
+      );
+    }
+  );
+}
+
+function tryFinishDiskGhost() {
+  if (!loadingDiskGhost) {
+    return;
+  }
+
+  const allFramesLoaded =
+    loadingDiskGhost.loadedFrames >=
+    loadingDiskGhost.expectedFrames;
+
+  if (
+    !loadingDiskGhost.transferFinished ||
+    !allFramesLoaded
+  ) {
+    return;
+  }
+
+  const finishedSequence =
+    loadingDiskGhost.frames.filter(
+      frame => frame !== undefined
+    );
+
+  if (
+    finishedSequence.length >= 5 &&
+    activeGhosts.length < maxGhosts
+  ) {
+    activeGhosts.push(
+      new Ghost(finishedSequence)
+    );
+
+    console.log(
+      "Geist von Festplatte gespawnt:",
+      loadingDiskGhost.ghostId
+    );
+  }
+
+  loadingDiskGhost = null;
+  diskGhostRequestPending = false;
+
+  scheduleNextDiskGhost();
+}
+
+function scheduleNextDiskGhost() {
+  const delay = random(
+    minGhostSpawnDelay,
+    maxGhostSpawnDelay
+  );
+
+  console.log(
+    "Nächster Festplatten-Geist in ca.",
+    round(delay / 1000),
+    "Sekunden"
+  );
+
+  setTimeout(
+    requestRandomDiskGhost,
+    delay
+  );
+}
+
+function requestRandomDiskGhost() {
+  if (
+    !socket ||
+    socket.readyState !== WebSocket.OPEN
+  ) {
+    scheduleNextDiskGhost();
+    return;
+  }
+
+  // Es wird bereits ein Geist geladen
+  if (diskGhostRequestPending) {
+    scheduleNextDiskGhost();
+    return;
+  }
+
+  // Maximalzahl an sichtbaren Geistern erreicht
+  if (activeGhosts.length >= maxGhosts) {
+    scheduleNextDiskGhost();
+    return;
+  }
+
+  diskGhostRequestPending = true;
+
+  socket.send(
+    JSON.stringify({
+      type: "request_random_ghost"
+    })
+  );
 }
 
 
@@ -101,6 +302,8 @@ function draw() {
   const personPresentNow = hasPerson(kinectImage);
 
   updateDissolveEffect(personPresentNow);
+
+  //saveFrames('ghost','png', 3, 22);
   updateRecording(personPresentNow);
 
   wasPersonPresent = personPresentNow;
@@ -193,8 +396,16 @@ function updateRecording(personPresentNow) {
     if (currentSequence.length >= 5) {
       const finishedSequence = [...currentSequence];
 
+      // Auf Festplatte speichern
+      saveGhostToDisk(finishedSequence).catch(error => {
+        console.error(
+          "Geist konnte nicht gespeichert werden:",
+          error
+        );
+      });
+
+      // Zusätzlich weiterhin im RAM speichern
       memoryBank.push(finishedSequence);
-      memoryBank = shuffle(memoryBank);
 
       if (memoryBank.length > maxSequences) {
         memoryBank.shift();
@@ -557,6 +768,70 @@ function drawKinectImage(img) {
   const y = (height - drawH) / 2;
 
   image(img, x, y, drawW, drawH);
+}
+
+async function saveGhostToDisk(sequence) {
+  if (!socket || socket.readyState !== WebSocket.OPEN) {
+    console.error("WebSocket ist nicht verbunden.");
+    return;
+  }
+
+  const ghostId = "ghost_" + Date.now();
+
+  socket.send(JSON.stringify({
+    type: "ghost_start",
+    ghostId: ghostId,
+    frameCount: sequence.length,
+    recordInterval: recordInterval,
+    createdAt: new Date().toISOString()
+  }));
+
+  for (let i = 0; i < sequence.length; i++) {
+    const img = sequence[i];
+
+    // p5.Image in eine PNG-Datei als Base64 umwandeln
+    const dataUrl = img.canvas.toDataURL("image/png");
+
+    // "data:image/png;base64," entfernen
+    const base64Data = dataUrl.split(",")[1];
+
+    socket.send(JSON.stringify({
+      type: "ghost_frame",
+      ghostId: ghostId,
+      frameIndex: i,
+      data: base64Data
+    }));
+
+    // Verhindert, dass der WebSocket-Puffer überfüllt wird
+    await waitForSocketBuffer();
+  }
+
+  socket.send(JSON.stringify({
+    type: "ghost_end",
+    ghostId: ghostId
+  }));
+
+  console.log(
+    "Geist an Python gesendet:",
+    ghostId,
+    sequence.length,
+    "Frames"
+  );
+}
+
+function waitForSocketBuffer() {
+  return new Promise(resolve => {
+    const checkBuffer = function () {
+      // Erst weitersenden, wenn weniger als 1 MB wartet
+      if (socket.bufferedAmount < 1_000_000) {
+        resolve();
+      } else {
+        setTimeout(checkBuffer, 20);
+      }
+    };
+
+    checkBuffer();
+  });
 }
 
 function windowResized() {
