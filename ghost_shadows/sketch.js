@@ -1,3 +1,12 @@
+/*browserteil der kinect schatteninstallation
+
+hier werden
+- live tiefenbilder vom python websocket server empfangen
+- erkannt anhand dunkler Pixel ob eine person im bild steht
+- nimmt die personen auf und speichert diese ueber python auf der festplatte
+- spielt gespeicherte sequenzen spaeter als farbige geister ab
+* */
+
 let socket;
 let kinectImage;
 
@@ -56,8 +65,7 @@ let ghostColors = [
 
 
 
-
-
+// p5.js initialisieren und canvas erstellen anschliessend mit websocket verbinden
 function setup() {
   createCanvas(windowWidth, windowHeight);
 
@@ -72,50 +80,41 @@ function setup() {
     console.error("WebSocket-Fehler:", error);
   };
 
-  socket.onclose = function () {
-    console.log("Verbindung zum Kinect-Server geschlossen.");
-  };
-
   socket.onmessage = function (event) {
   const message = event.data;
 
-  // JSON-Nachricht vom Python-Server
+  // JSON-Nachricht vom Python-Server fuer gespeicherte geister
   if (message.startsWith("{")) {
     try {
       const data = JSON.parse(message);
       handleServerMessage(data);
     } catch (error) {
-      console.error(
-        "Server-Nachricht konnte nicht gelesen werden:",
-        error
-      );
+      console.error("Server-Nachricht konnte nicht gelesen werden:", error);
     }
 
     return;
   }
 
-  // Normales Kinect-Live-Bild
-  const imgSrc =
-    "data:image/jpeg;base64," + message;
+  //alle anderen nachrichten sind JPEG kodierte kinect livebilder
+  const imgSrc = "data:image/jpeg;base64," + message;
 
-  loadImage(
-    imgSrc,
+  loadImage(imgSrc,
 
     function (img) {
       kinectImage = img;
     },
 
     function (error) {
-      console.error(
-        "Kinect-Bild konnte nicht geladen werden:",
-        error
-      );
+      console.error("Kinect-Bild konnte nicht geladen werden:", error);
     }
   );
 };
 }
 
+//verarbeitet die steuerbefehlt zum laden gespeicherter geister
 function handleServerMessage(data) {
+
+  //server sagt welcher geist geladen wird und wie viele einzelbilder zur sequenz gehoeren
   if (data.type === "ghost_load_start") {
     loadingDiskGhost = {
       ghostId: data.ghostId,
@@ -125,10 +124,7 @@ function handleServerMessage(data) {
       transferFinished: false
     };
 
-    console.log(
-      "Lade Geist von Festplatte:",
-      data.ghostId
-    );
+    console.log("Lade Geist von Festplatte:", data.ghostId);
   }
 
   else if (data.type === "ghost_load_frame") {
@@ -140,26 +136,29 @@ function handleServerMessage(data) {
       loadingDiskGhost &&
       loadingDiskGhost.ghostId === data.ghostId
     ) {
+      //uebertragung ist fertig aber einzelne bilder keonnen wegen des asynchronen ladens trotzdem noch fehlen
       loadingDiskGhost.transferFinished = true;
       tryFinishDiskGhost();
     }
   }
 
+  //falls nocht kein vollstaendiger geist gefunden wurde (zum debuggen)
   else if (data.type === "ghost_load_none") {
-    console.log(
-      "Auf der Festplatte befinden sich noch keine Geister."
-    );
+    console.log("Auf der Festplatte befinden sich noch keine Geister.");
 
     diskGhostRequestPending = false;
     scheduleNextDiskGhost();
   }
 }
 
+//laedt ein bild einer gespeicherten geistersequenz
 function loadDiskGhostFrame(data) {
   if (!loadingDiskGhost) {
     return;
   }
 
+  //pruefung ob das empfangene bild wirklich zu dem geist gehoert den wir gerade laden
+  //falls nicht wird es ignoriert
   if (loadingDiskGhost.ghostId !== data.ghostId) {
     return;
   }
@@ -180,19 +179,18 @@ function loadDiskGhostFrame(data) {
     },
 
     function (error) {
-      console.error(
-        "Ghost-Frame konnte nicht geladen werden:",
-        error
-      );
+      console.error("Ghost-Frame konnte nicht geladen werden:", error);
     }
   );
 }
 
+// prueft ob eine vollstaendig geladene sequenz als geist erzeugt werden kann
 function tryFinishDiskGhost() {
   if (!loadingDiskGhost) {
     return;
   }
 
+  //erst wenn jedes erwartete bild geladen wurde ist die sequenz vollstaendig
   const allFramesLoaded =
     loadingDiskGhost.loadedFrames >=
     loadingDiskGhost.expectedFrames;
@@ -203,7 +201,7 @@ function tryFinishDiskGhost() {
   ) {
     return;
   }
-
+  // leere arrayplaetze werden entfernt damit nicht auf ein leeres array ausversehen zugegriffen wird
   const finishedSequence =
     loadingDiskGhost.frames.filter(
       frame => frame !== undefined
@@ -229,29 +227,20 @@ function tryFinishDiskGhost() {
   scheduleNextDiskGhost();
 }
 
+//plant den naechsten geist nach einer random wartezeit
 function scheduleNextDiskGhost() {
   const delay = random(
     minGhostSpawnDelay,
     maxGhostSpawnDelay
   );
 
-  console.log(
-    "Nächster Festplatten-Geist in ca.",
-    round(delay / 1000),
-    "Sekunden"
-  );
+  console.log("Nächster Festplatten-Geist in ca.", round(delay / 1000), "Sekunden");
 
-  setTimeout(
-    requestRandomDiskGhost,
-    delay
-  );
+  setTimeout(requestRandomDiskGhost, delay);
 }
 
 function requestRandomDiskGhost() {
-  if (
-    !socket ||
-    socket.readyState !== WebSocket.OPEN
-  ) {
+  if (!socket || socket.readyState !== WebSocket.OPEN) {
     scheduleNextDiskGhost();
     return;
   }
@@ -278,9 +267,11 @@ function requestRandomDiskGhost() {
 }
 
 
+//p5.js ruft draw() fortlaufend auf und erzeugt dadurch die animation
 function draw() {
   background(255);
 
+  //ohne kinectbild kann noch nichts ausgewertet werden
   if (!kinectImage) {
     fill(0);
     noStroke();
@@ -289,13 +280,15 @@ function draw() {
     return;
   }
 
+  // ueber die anzahl unkler pixel wird geschaetzt ob eine person im bild steht
   const personPresentNow = hasPerson(kinectImage);
 
   updateDissolveEffect(personPresentNow);
 
-  //saveFrames('ghost','png', 3, 22);
   updateRecording(personPresentNow);
 
+  //den aktuellen zustand fuer den naechsten draw() durchlauf speichern
+  //damit erkannt werden aknn ob eine person gerade gekommen oder gegangen ist
   wasPersonPresent = personPresentNow;
 
   // Live-Schatten zeichnen
@@ -322,10 +315,11 @@ function draw() {
   blendMode(BLEND);
   noTint();
 
+  //nur zum debuggen und testen
   drawDebugInformation(personPresentNow);
 }
 
-
+//steuert start, verlauf und abschluss einer aufnahme
 function updateRecording(personPresentNow) {
   // Person betritt neu den Aufnahmebereich
   if (!wasPersonPresent && personPresentNow) {
@@ -334,19 +328,15 @@ function updateRecording(personPresentNow) {
     recordingStarted = false;
     recordingFinished = false;
 
-    // Zufälliger Aufnahmestart zwischen ungefähr 3 und 10 Sekunden
-    recordStartFrame =
-      frameCount + floor(random(90, 300));
+    // zufaelliger Aufnahmestart zwischen ungefaehr 3 und 10 Sekunden
+    recordStartFrame = frameCount + floor(random(90, 300));
 
-    console.log(
-      "Aufnahme startet bei Frame:",
-      recordStartFrame
-    );
+    console.log("Aufnahme startet bei Frame:", recordStartFrame);
   }
 
   // Person ist sichtbar
   if (personPresentNow) {
-    // Zufälligen Aufnahmezeitpunkt erreicht
+    // Zufaelligen Aufnahmezeitpunkt erreicht
     if (
       !recordingStarted &&
       !recordingFinished &&
@@ -358,7 +348,7 @@ function updateRecording(personPresentNow) {
       console.log("Aufnahme gestartet");
     }
 
-    // Nur aufnehmen, solange die Aufnahme läuft
+    // Nur aufnehmen solange die Aufnahme laeuft
     if (
       recordingStarted &&
       !recordingFinished &&
@@ -366,35 +356,28 @@ function updateRecording(personPresentNow) {
     ) {
       currentSequence.push(kinectImage.get());
 
-      // Aufnahme nach gewünschter Länge beenden
+      // Aufnahme nach gewuenschter laenge beenden
       if (currentSequence.length >= recordLength) {
         recordingStarted = false;
         recordingFinished = true;
 
-        console.log(
-          "Aufnahme beendet:",
-          currentSequence.length,
-          "Frames"
-        );
+        console.log("Aufnahme beendet:", currentSequence.length, "Frames");
       }
     }
   }
 
-  // Person verlässt den Aufnahmebereich
+  //person verlaesst den aufnahmebereich
   if (wasPersonPresent && !personPresentNow) {
-    // Nur einen Geist erzeugen, wenn wirklich genug aufgenommen wurde
+    //nur einen geist erzeugen wenn wirklich genug aufgenommen wurde
     if (currentSequence.length >= 5) {
       const finishedSequence = [...currentSequence];
 
-      // Auf Festplatte speichern
+      //auf Festplatte speichern
       saveGhostToDisk(finishedSequence).catch(error => {
-        console.error(
-          "Geist konnte nicht gespeichert werden:",
-          error
-        );
+        console.error("Geist konnte nicht gespeichert werden:", error);
       });
 
-      // Zusätzlich weiterhin im RAM speichern
+      //zusaetzlich weiterhin im RAM speichern
       memoryBank.push(finishedSequence);
 
       if (memoryBank.length > maxSequences) {
@@ -412,7 +395,7 @@ function updateRecording(personPresentNow) {
       );
     }
 
-    // Alles für die nächste Person zurücksetzen
+    // alles für die naechste person zuruecksetzen
     currentSequence = [];
     recordingStarted = false;
     recordingFinished = false;
@@ -420,9 +403,10 @@ function updateRecording(personPresentNow) {
   }
 }
 
-
+//berechnet den fortschirtt des aufloesungseffektes des live schattens
 function updateDissolveEffect(personPresentNow) {
   if (personPresentNow) {
+    //zaehlt wie lange die person ohne unterbrechung sichtbar ist
     personVisibleFrames++;
 
     if (personVisibleFrames > dissolveStartFrames) {
@@ -432,7 +416,7 @@ function updateDissolveEffect(personPresentNow) {
       );
     }
   } else {
-    // Sobald keine Person mehr sichtbar ist, zurücksetzen
+    // sobald keine Person mehr sichtbar ist zuruecksetzen
     personVisibleFrames = 0;
     dissolveProgress = 0;
   }
@@ -440,7 +424,7 @@ function updateDissolveEffect(personPresentNow) {
 
 
 function drawTopDownDissolve(img, progress) {
-  // Zuerst das unveränderte, glatte Bild zeichnen
+  // zuerst das unveraenderte glatte Bild zeichnen
   drawKinectImage(img);
 
   img.loadPixels();
@@ -458,14 +442,14 @@ function drawTopDownDissolve(img, progress) {
   const imageOffsetX = (width - drawW) / 2;
   const imageOffsetY = (height - drawH) / 2;
 
-  // Grenze in den Koordinaten des Kinect-Bildes
+  // grenze in den koordinaten des kinect bildes
   const dissolveLine = progress * img.height;
 
-  // Grenze in Bildschirmkoordinaten
+  // grenze in bildschirmkoordinaten
   const dissolveScreenY =
     imageOffsetY + dissolveLine * s;
 
-  // Alles oberhalb der Grenze aus dem normalen Schatten entfernen
+  // alles oberhalb der grenze aus dem normalen schatten entfernen
   fill(255);
   noStroke();
 
@@ -476,7 +460,7 @@ function drawTopDownDissolve(img, progress) {
     dissolveScreenY - imageOffsetY
   );
 
-  // Partikel nur im bereits aufgelösten Bereich zeichnen
+  // Partikel nur im bereits aufgeloesten bereich zeichnen
   for (let y = 0; y < dissolveLine; y += step) {
     for (let x = 0; x < img.width; x += step) {
       const index = (x + y * img.width) * 4;
@@ -488,7 +472,7 @@ function drawTopDownDissolve(img, progress) {
           img.pixels[index + 2]
         ) / 3;
 
-      // Nur schwarze Schattenpixel verwenden
+      // Nur schwarze schattenpixel verwenden
       if (brightness >= 50) {
         continue;
       }
@@ -498,11 +482,7 @@ function drawTopDownDissolve(img, progress) {
 
       const distanceFromLine = dissolveLine - y;
 
-      const localProgress = constrain(
-        distanceFromLine / 100,
-        0,
-        1
-      );
+      const localProgress = constrain(distanceFromLine / 100, 0, 1);
 
       const noiseValue = noise(
         x * 0.04,
@@ -510,27 +490,13 @@ function drawTopDownDissolve(img, progress) {
         frameCount * 0.015
       );
 
-      const particleOffsetX =
-        (noiseValue - 0.5) *
-        110 *
-        localProgress;
+      const particleOffsetX = (noiseValue - 0.5) * 110 * localProgress;
 
-      const particleOffsetY =
-        -100 *
-        localProgress *
-        noiseValue;
+      const particleOffsetY = -100 * localProgress * noiseValue;
 
-      const circleSize = lerp(
-        step * s + 2,
-        1,
-        localProgress
-      );
+      const circleSize = lerp(step * s + 2, 1, localProgress);
 
-      const alpha = lerp(
-        255,
-        0,
-        localProgress
-      );
+      const alpha = lerp(255, 0, localProgress);
 
       fill(0, alpha);
 
@@ -550,8 +516,8 @@ class Ghost {
 
     this.color = random(ghostColors);
 
-    // Frames werden nur einmal eingefärbt.
-    // Dadurch bleibt die Wiedergabe flüssiger.
+    // Frames werden nur einmal eingefaerbt
+    // dadurch bleibt die wiedergabe fluessiger
     this.sequence = sequence.map(
       img => this.createColoredFrame(img)
     );
@@ -564,8 +530,7 @@ class Ghost {
     this.state = "FADE_IN";
     this.isDead = false;
 
-    // Ein gespeicherter Frame bleibt sechs draw()-Frames sichtbar.
-    // Für flüssigere Wiedergabe auf 2 oder 3 setzen.
+    // Ein gespeicherter Frame bleibt sechs draw() frames sichtbar
     this.animationSpeed = 3;
 
     this.age = 0;
@@ -585,13 +550,13 @@ class Ghost {
         ) / 3;
 
       if (brightness < 50) {
-        // Schwarzer Schatten wird farbig
+        // schwarzer Schatten wird farbig
         colored.pixels[i] = this.color.r;
         colored.pixels[i + 1] = this.color.g;
         colored.pixels[i + 2] = this.color.b;
         colored.pixels[i + 3] = 255;
       } else {
-        // Weißer Hintergrund wird transparent
+        // weisser Hintergrund wird transparent
         colored.pixels[i + 3] = 0;
       }
     }
@@ -601,7 +566,7 @@ class Ghost {
     return colored;
   }
 
-
+  //update den zustand des geistes bei jedem draw() durchlauf
   update() {
     this.age++;
 
@@ -627,6 +592,7 @@ class Ghost {
       }
     }
 
+    //geist wechselt nur bei jedem 3. draw() durchlauf zum naechsten frame
     if (this.age % this.animationSpeed === 0) {
       this.frameIndex++;
 
@@ -650,14 +616,13 @@ class Ghost {
   }
 }
 
-
+//prueft ueber dunkle stichprobenpixel ob eine person sichtbar ist
 function hasPerson(img) {
   img.loadPixels();
 
   let darkPixelCount = 0;
 
-  // i += 400 bedeutet:
-  // Es wird nur ein Teil der Pixel geprüft, damit es schneller läuft.
+  // i += 400 bedeutet es wird nur ein teil der pixel geprueft damit es schneller laeuft.
   for (let i = 0; i < img.pixels.length; i += 400) {
     if (img.pixels[i] < 50) {
       darkPixelCount++;
@@ -669,32 +634,18 @@ function hasPerson(img) {
   return darkPixelCount > humanMassThreshold;
 }
 
-
+//nur zum debuggen
 function drawDebugInformation(personPresentNow) {
   fill(255, 0, 0);
   noStroke();
   textSize(28);
   textAlign(LEFT, TOP);
 
-  text(
-    "Live-Pixel-Masse: " + currentPixelMass,
-    30,
-    30
-  );
+  text("Live-Pixel-Masse: " + currentPixelMass, 30, 30);
 
-  text(
-    "Threshold: " + humanMassThreshold,
-    30,
-    65
-  );
+  text("Threshold: " + humanMassThreshold, 30, 65);
 
-  text(
-    "Auflösung: " +
-    nf(dissolveProgress * 100, 1, 1) +
-    "%",
-    30,
-    100
-  );
+  text("Auflösung: " + nf(dissolveProgress * 100, 1, 1) + "%", 30, 100);
 
   if (personPresentNow) {
   fill(0, 170, 0);
@@ -704,47 +655,26 @@ function drawDebugInformation(personPresentNow) {
   if (recordingFinished) {
     recordingStatus = "ERINNERUNG GESPEICHERT";
   } else if (recordingStarted) {
-    recordingStatus =
-      "AUFNAHME: " +
-      currentSequence.length +
-      " / " +
-      recordLength;
+    recordingStatus = "AUFNAHME: " + currentSequence.length + " / " + recordLength;
   } else {
-    const remainingFrames = max(
-      recordStartFrame - frameCount,
-      0
-    );
+    const remainingFrames = max(recordStartFrame - frameCount, 0);
 
-    recordingStatus =
-      "AUFNAHME STARTET IN CA. " +
-      ceil(remainingFrames / 30) +
-      " S";
+    recordingStatus = "AUFNAHME STARTET IN CA. " + ceil(remainingFrames / 30) + " S";
   }
 
-  text(
-    "STATUS: " + recordingStatus,
-    30,
-    135
-  );
+  text("STATUS: " + recordingStatus, 30, 135);
 
   if (personVisibleFrames > dissolveStartFrames) {
-    text(
-      "SCHATTEN LÖST SICH AUF",
-      30,
-      170
-    );
+    text("SCHATTEN LÖST SICH AUF", 30, 170);
   }
 } else {
     fill(0, 0, 255);
 
-    text(
-      "STATUS: RAUM LEER / GEISTER AKTIV",
-      30,
-      135
-    );
+    text("STATUS: RAUM LEER / GEISTER AKTIV", 30, 135);
   }
 }
 
+//skaliert das kinect bild proportional und zentriert es im fenster
 function drawKinectImage(img) {
   const s = Math.min(
     width / img.width,
@@ -760,14 +690,16 @@ function drawKinectImage(img) {
   image(img, x, y, drawW, drawH);
 }
 
+//uebertraegt eine fertige sequenz an python dass sie als dateien speichert
 async function saveGhostToDisk(sequence) {
   if (!socket || socket.readyState !== WebSocket.OPEN) {
     console.error("WebSocket ist nicht verbunden.");
     return;
   }
-
+  // erzeugt einen namen fuer den geist mit dem zeitstempel
   const ghostId = "ghost_" + Date.now();
 
+  //senden der metadaten einer aufnahme an python server
   socket.send(JSON.stringify({
     type: "ghost_start",
     ghostId: ghostId,
@@ -776,10 +708,11 @@ async function saveGhostToDisk(sequence) {
     createdAt: new Date().toISOString()
   }));
 
+  //jedes bild wird einzeln als PNG uebertragen
   for (let i = 0; i < sequence.length; i++) {
     const img = sequence[i];
 
-    // p5.Image in eine PNG-Datei als Base64 umwandeln
+    // p5.Image in eine PNG Datei als base64 umwandeln
     const dataUrl = img.canvas.toDataURL("image/png");
 
     // "data:image/png;base64," entfernen
@@ -792,7 +725,7 @@ async function saveGhostToDisk(sequence) {
       data: base64Data
     }));
 
-    // Verhindert, dass der WebSocket-Puffer überfüllt wird
+    // Verhindert dass der WebSocket-Puffer ueberfuellt wird
     await waitForSocketBuffer();
   }
 
@@ -801,14 +734,10 @@ async function saveGhostToDisk(sequence) {
     ghostId: ghostId
   }));
 
-  console.log(
-    "Geist an Python gesendet:",
-    ghostId,
-    sequence.length,
-    "Frames"
-  );
+  console.log("Geist an Python gesendet:", ghostId, sequence.length, "Frames");
 }
 
+//wartet falls der browser noch zu viele daten im websocket puffer hat
 function waitForSocketBuffer() {
   return new Promise(resolve => {
     const checkBuffer = function () {

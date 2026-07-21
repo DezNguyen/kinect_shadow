@@ -1,3 +1,8 @@
+"""WebSocket Server fuer die Kinect-Schatteninstallation
+Hier werden die Tiefenbilder der Azure Kinect in eine Schwarz-Weiss Maske umgewandelt
+Die Maske wird dann fortlaufend an den Browser gesendet und aufgenommene Geistersequenzen gespeichert und zufaellig
+wieder geladen"""
+
 import asyncio
 import base64
 import cv2
@@ -10,10 +15,12 @@ from pathlib import Path
 import random
 
 
+# Alle Geister werden hier gespeichert und nicht auf dem RAM
 BASE_DIRECTORY = Path(__file__).resolve().parent
 GHOST_DIRECTORY = BASE_DIRECTORY / "ghosts"
 GHOST_DIRECTORY.mkdir(parents=True, exist_ok=True)
 
+#Azure Kinext Bibliothek initialisieren und nur Tiefensensor aktivieren
 pykinect.initialize_libraries()
 
 device_config = pykinect.default_configuration
@@ -27,18 +34,17 @@ device_config.depth_resolution = pykinect.K4A_DEPTH_MODE_WFOV_UNBINNED
 device = pykinect.start_device(config=device_config)
 
 
-calibration = device.get_calibration(
-    depth_mode=device_config.depth_resolution,
-    color_resolution=device_config.color_resolution)
-params = calibration.depth_params
+# calibration = device.get_calibration(
+#     depth_mode=device_config.depth_resolution,
+#     color_resolution=device_config.color_resolution)
+# params = calibration.depth_params
 
 
 MIN_DEPTH = 1
 MAX_DEPTH = 2100
 
 
-
-#Websocket handler
+#liesst Kinect Tiefenbilder und sendet sie als JPEG an den Browser
 async def send_kinect_frames(websocket):
     while True:
         capture = device.update()
@@ -71,6 +77,7 @@ async def send_kinect_frames(websocket):
 
         await asyncio.sleep(1 / 30)
 
+#Verarbeitet Steuer- und Speichernachtichten des Browsers (eher nur zum debuggen)
 async def receive_browser_messages(websocket):
     async for message in websocket:
         if not isinstance(message, str):
@@ -97,6 +104,7 @@ async def receive_browser_messages(websocket):
             )
 
 
+#startet senden und empfangen parallel fuer die Browserverbindung
 async def handler(websocket):
     send_task = asyncio.create_task(
         send_kinect_frames(websocket)
@@ -127,6 +135,8 @@ async def handler(websocket):
             receive_task,
             return_exceptions=True
         )
+
+#entfernt den Fishlense effekt
 def remove_fisheye(img, strength=0.25):
     h, w = img.shape[:2]
     y, x = np.indices((h, w), dtype=np.float32)
@@ -146,11 +156,10 @@ def remove_fisheye(img, strength=0.25):
 
     return cv2.remap(img, map_x, map_y, cv2.INTER_NEAREST)
 
+#unerlaubte zeichen werden aus der Ghost-id entfernt
+#hilfsfunktion weil p5js komische dateipfade erstellt hat
 def safe_ghost_id(ghost_id: str) -> str:
-    """
-    Entfernt unerlaubte Zeichen aus der Ghost-ID.
-    Dadurch kann JavaScript keine beliebigen Dateipfade erzeugen.
-    """
+
     cleaned = re.sub(r"[^a-zA-Z0-9_-]", "", ghost_id)
 
     if not cleaned:
@@ -158,6 +167,7 @@ def safe_ghost_id(ghost_id: str) -> str:
 
     return cleaned
 
+#speichert start, einzelbilder und abschluss einer geistersequenz
 def handle_ghost_message(message: str) -> None:
     try:
         data = json.loads(message)
@@ -232,6 +242,7 @@ def handle_ghost_message(message: str) -> None:
         print(f"Geist vollständig gespeichert: {ghost_id}")
 
 
+#waehlt eine vollstaendige aufnahme aus und sendet sie an den browser
 async def send_random_ghost(websocket):
     available_ghosts = []
 
