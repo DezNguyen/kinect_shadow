@@ -54,7 +54,7 @@ let ghostColors = [
   {r: 255, g: 100, b: 190},
 ]
 
-//Farbpalette fuer Geister
+
 
 
 
