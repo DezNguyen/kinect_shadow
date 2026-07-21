@@ -10,6 +10,12 @@ let recordInterval = 2;
 let currentSequence = [];
 let wasPersonPresent = false;
 
+let recordingStarted = false;
+let recordingFinished = false;
+
+let recordStartFrame = 0;
+let recordLength = 120;
+
 // Aktive Geister
 let activeGhosts = [];
 let maxGhosts = 3;
@@ -17,6 +23,7 @@ let maxGhosts = 3;
 // Personenerkennung
 let humanMassThreshold = 75;
 let currentPixelMass = 0;
+let shadowIndex = 0;
 
 // Auflösungseffekt des Live-Schattens
 let personVisibleFrames = 0;
@@ -29,7 +36,15 @@ let dissolveStartFrames = 300;
 let dissolveProgress = 0;
 
 // Geschwindigkeit der Auflösung
-let dissolveSpeed = 0.0025;
+let dissolveSpeed = 0.0010;
+
+//Ghost farbpalette
+let ghostColors = [
+  {r: 255, g: 80, b: 80},
+  {r: 80, g: 220, b: 120},
+  {r: 110, g: 100, b: 155},
+  {r: 255, g: 100, b: 190},
+]
 
 //Farbpalette fuer Geister
 
@@ -119,34 +134,88 @@ function draw() {
 
 
 function updateRecording(personPresentNow) {
-  // Solange eine Person sichtbar ist, Frames aufnehmen
+  // Person betritt neu den Aufnahmebereich
+  if (!wasPersonPresent && personPresentNow) {
+    currentSequence = [];
+
+    recordingStarted = false;
+    recordingFinished = false;
+
+    // Zufälliger Aufnahmestart zwischen ungefähr 3 und 10 Sekunden
+    recordStartFrame =
+      frameCount + floor(random(90, 300));
+
+    console.log(
+      "Aufnahme startet bei Frame:",
+      recordStartFrame
+    );
+  }
+
+  // Person ist sichtbar
   if (personPresentNow) {
-    if (frameCount % recordInterval === 0) {
+    // Zufälligen Aufnahmezeitpunkt erreicht
+    if (
+      !recordingStarted &&
+      !recordingFinished &&
+      frameCount >= recordStartFrame
+    ) {
+      recordingStarted = true;
+      currentSequence = [];
+
+      console.log("Aufnahme gestartet");
+    }
+
+    // Nur aufnehmen, solange die Aufnahme läuft
+    if (
+      recordingStarted &&
+      !recordingFinished &&
+      frameCount % recordInterval === 0
+    ) {
       currentSequence.push(kinectImage.get());
 
-      // Begrenzung des Arbeitsspeichers
-      if (currentSequence.length > 60) {
-        currentSequence.shift();
+      // Aufnahme nach gewünschter Länge beenden
+      if (currentSequence.length >= recordLength) {
+        recordingStarted = false;
+        recordingFinished = true;
+
+        console.log(
+          "Aufnahme beendet:",
+          currentSequence.length,
+          "Frames"
+        );
       }
     }
   }
 
-  // Person war vorher da, ist jetzt aber verschwunden
+  // Person verlässt den Aufnahmebereich
   if (wasPersonPresent && !personPresentNow) {
+    // Nur einen Geist erzeugen, wenn wirklich genug aufgenommen wurde
     if (currentSequence.length >= 5) {
-      memoryBank.push([...currentSequence]);
+      const finishedSequence = [...currentSequence];
+
+      memoryBank.push(finishedSequence);
+      memoryBank = shuffle(memoryBank);
 
       if (memoryBank.length > maxSequences) {
         memoryBank.shift();
       }
 
       if (activeGhosts.length < maxGhosts) {
-        const selectedSequence = random(memoryBank);
-        activeGhosts.push(new Ghost(selectedSequence));
+        activeGhosts.push(
+          new Ghost(finishedSequence)
+        );
       }
+    } else {
+      console.log(
+        "Person ging zu früh – keine vollständige Aufnahme"
+      );
     }
 
+    // Alles für die nächste Person zurücksetzen
     currentSequence = [];
+    recordingStarted = false;
+    recordingFinished = false;
+    recordStartFrame = 0;
   }
 }
 
@@ -175,7 +244,7 @@ function drawTopDownDissolve(img, progress) {
 
   img.loadPixels();
 
-  const step = 6;
+  const step = 2;
 
   const s = Math.min(
     width / img.width,
@@ -362,15 +431,6 @@ class Ghost {
 
       if (this.frameIndex >= this.sequence.length) {
         this.frameIndex = 0;
-
-        // Nach einem Durchlauf optional eine andere Sequenz verwenden
-        if (memoryBank.length > 0) {
-          const selectedSequence = random(memoryBank);
-
-          this.sequence = selectedSequence.map(
-            img => this.createColoredFrame(img)
-          );
-        }
       }
     }
   }
@@ -436,27 +496,44 @@ function drawDebugInformation(personPresentNow) {
   );
 
   if (personPresentNow) {
-    fill(0, 170, 0);
+  fill(0, 170, 0);
 
-    if (personVisibleFrames <= dissolveStartFrames) {
-      const remainingFrames =
-        dissolveStartFrames - personVisibleFrames;
+  let recordingStatus;
 
-      text(
-        "STATUS: AUFNAHME – Auflösung startet in ca. " +
-        ceil(remainingFrames / 30) +
-        " s",
-        30,
-        135
-      );
-    } else {
-      text(
-        "STATUS: SCHATTEN LÖST SICH AUF",
-        30,
-        135
-      );
-    }
+  if (recordingFinished) {
+    recordingStatus = "ERINNERUNG GESPEICHERT";
+  } else if (recordingStarted) {
+    recordingStatus =
+      "AUFNAHME: " +
+      currentSequence.length +
+      " / " +
+      recordLength;
   } else {
+    const remainingFrames = max(
+      recordStartFrame - frameCount,
+      0
+    );
+
+    recordingStatus =
+      "AUFNAHME STARTET IN CA. " +
+      ceil(remainingFrames / 30) +
+      " S";
+  }
+
+  text(
+    "STATUS: " + recordingStatus,
+    30,
+    135
+  );
+
+  if (personVisibleFrames > dissolveStartFrames) {
+    text(
+      "SCHATTEN LÖST SICH AUF",
+      30,
+      170
+    );
+  }
+} else {
     fill(0, 0, 255);
 
     text(
