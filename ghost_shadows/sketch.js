@@ -89,8 +89,8 @@ function draw() {
 
   updateDissolveEffect(personPresentNow);
 
-  saveFrames('ghost','png', 3, 22);
-  //updateRecording(personPresentNow);
+  //saveFrames('ghost','png', 3, 22);
+  updateRecording(personPresentNow);
 
   wasPersonPresent = personPresentNow;
 
@@ -182,9 +182,16 @@ function updateRecording(personPresentNow) {
     if (currentSequence.length >= 5) {
       const finishedSequence = [...currentSequence];
 
+      // Auf Festplatte speichern
+      saveGhostToDisk(finishedSequence).catch(error => {
+        console.error(
+          "Geist konnte nicht gespeichert werden:",
+          error
+        );
+      });
 
+      // Zusätzlich weiterhin im RAM speichern
       memoryBank.push(finishedSequence);
-      memoryBank = shuffle(memoryBank);
 
       if (memoryBank.length > maxSequences) {
         memoryBank.shift();
@@ -547,6 +554,70 @@ function drawKinectImage(img) {
   const y = (height - drawH) / 2;
 
   image(img, x, y, drawW, drawH);
+}
+
+async function saveGhostToDisk(sequence) {
+  if (!socket || socket.readyState !== WebSocket.OPEN) {
+    console.error("WebSocket ist nicht verbunden.");
+    return;
+  }
+
+  const ghostId = "ghost_" + Date.now();
+
+  socket.send(JSON.stringify({
+    type: "ghost_start",
+    ghostId: ghostId,
+    frameCount: sequence.length,
+    recordInterval: recordInterval,
+    createdAt: new Date().toISOString()
+  }));
+
+  for (let i = 0; i < sequence.length; i++) {
+    const img = sequence[i];
+
+    // p5.Image in eine PNG-Datei als Base64 umwandeln
+    const dataUrl = img.canvas.toDataURL("image/png");
+
+    // "data:image/png;base64," entfernen
+    const base64Data = dataUrl.split(",")[1];
+
+    socket.send(JSON.stringify({
+      type: "ghost_frame",
+      ghostId: ghostId,
+      frameIndex: i,
+      data: base64Data
+    }));
+
+    // Verhindert, dass der WebSocket-Puffer überfüllt wird
+    await waitForSocketBuffer();
+  }
+
+  socket.send(JSON.stringify({
+    type: "ghost_end",
+    ghostId: ghostId
+  }));
+
+  console.log(
+    "Geist an Python gesendet:",
+    ghostId,
+    sequence.length,
+    "Frames"
+  );
+}
+
+function waitForSocketBuffer() {
+  return new Promise(resolve => {
+    const checkBuffer = function () {
+      // Erst weitersenden, wenn weniger als 1 MB wartet
+      if (socket.bufferedAmount < 1_000_000) {
+        resolve();
+      } else {
+        setTimeout(checkBuffer, 20);
+      }
+    };
+
+    checkBuffer();
+  });
 }
 
 function windowResized() {
